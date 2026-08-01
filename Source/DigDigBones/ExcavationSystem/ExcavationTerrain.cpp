@@ -169,6 +169,7 @@ bool AExcavationTerrain::IsFaceVisible(const FVoxelCoord& Voxel, const FVoxelCoo
 		IsVoxelFaceVisible = false;
 	}
 
+
 	//We check if on our side we are visible from inside our density
 	if (IsVoxelFaceVisible) {
 		if (FaceDirection != EDirection::ED_NONE) {
