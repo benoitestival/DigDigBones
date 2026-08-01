@@ -12,6 +12,9 @@
 #define UP 1
 #define RIGHT 0
 
+#define BOTTOM_DIR FVector(0.0f, 0.0f, -1.0f)
+#define TOP_DIR FVector(0.0f, 0.0f, 1.0f)
+
 // Sets default values
 AExcavationTerrain::AExcavationTerrain() {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
@@ -62,24 +65,15 @@ void AExcavationTerrain::RefreshTerrain() {
 			for (int Y = 0; Y < SizeY; Y++) {
 				for (int Z = 0; Z < SizeZ; Z++) {
 					FVoxelCoord Coord = FVoxelCoord(X, Y, Z);
-					int VoxelIndex = ConvertXYZToIndex(Coord);
 					if (!IsOutOfBounds(Coord)) {
-						TArray<FVector> NeighborsOffsets = {
+						TArray<FVector> SideNormals = {
 							{1.0f, 0.0f, 0.0f},
 							{-1.0f, 0.0f, 0.0f},
 							{0.0f, 1.0f, 0.0f},
 							{0.0f, -1.0f, 0.0f},
-							{0.0f, 0.0f, 1.0f},
-							{.0f, 0.0f, -1.0f},
 						};
-						for (int NeighborIndex = 0; NeighborIndex < NUM_POSSIBLE_FACES; NeighborIndex++) {
-							FVoxelCoord NeighborCoord = Coord + NeighborsOffsets[NeighborIndex];
-							int NeighborVoxelIndex = ConvertXYZToIndex(NeighborCoord);
-							
-							TArray<FVector> FaceVertices = ComputeFaceVertices(Coord, NeighborsOffsets[NeighborIndex]);//Actual Coord and actual voxel face normal to neighbor
-							if (FaceVertices.Num() > 0) {
-								//TODO triangle, normales and uv
-							}
+						for (auto& SideNormal : SideNormals) {
+							TArray<FVector> SideVertices = ComputeSideFaceVertices(Coord, SideNormal);
 						}
 					}
 				}
@@ -94,111 +88,51 @@ void AExcavationTerrain::RefreshTerrain() {
 	}
 }
 
-TArray<FVector> AExcavationTerrain::ComputeFaceVertices(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal) {
+TArray<FVector> AExcavationTerrain::ComputeSideFaceVertices(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal) {
 	TArray<FVector> FaceVertices = TArray<FVector>();
-	if (IsFaceVisible(VoxelCoord, VoxelCoord + FaceNormal, FaceNormal)) {
-		FVector VoxelLocation = ConvertVoxelCoordToWorld(VoxelCoord);
-		
-		FVector FaceAxis = MaskVector(FaceNormal);
-		FVector FaceLocalRight = GetAxisAtIndex(FaceAxis, RIGHT);//Here we get the local right of the face as a normal vector
-		FVector FaceLocalUp = GetAxisAtIndex(FaceAxis, UP);//Here we get the local up of the face as a normal vector
-		
-		//The face doesn't render her back, so we only need to think of her local front, left, right, bottom and up
-		//Whatever is the face rotation we just need the normal then identify LocalUp and LocalRight and calculate TopLeft, TopRight, BottomLeft, BottomRight depending of the density diff with his neighbors
-		//
-		//				 	  FaceLocalUp (+)
-		//				 		   ^
-		//				 		   |
-		//				 /_________|__________/
-		//				 |         |         |
-		//				 |  TL     |     TR  |
-		//				 |    *----|----*    |
-		//				 |    |    |    |    |
-		//				 |----|----+----|----|--> FaceLocalRight (+)
-		//				 |    |    |    |    |
-		//				 |    *----|----*    |
-		//				 |  BL     |     BR  |
-		//				 |_________|_________/
-		//				 		   |
-		//						   |
-		//
-		//Face Local Right difference in density
-		float RightDensity = GetDensityDiffOnSide(VoxelCoord, FaceLocalRight);
-		//Face Local Left difference in density
-		float LeftDensity = GetDensityDiffOnSide(VoxelCoord, FaceLocalRight * -1);
-		//Face Local Top difference in density
-		float TopDensity = GetDensityDiffOnSide(VoxelCoord, FaceLocalUp);
-		//Face Local Bottom difference in density
-		float BottomDensity = GetDensityDiffOnSide(VoxelCoord, FaceLocalUp * -1);
-		//Face Local Front difference in density
-		float FrontDensity = GetDensityDiffOnSide(VoxelCoord, FaceNormal);
-		
-		//Local BottomLeft
-		FaceVertices.Add(VoxelLocation + LeftDensity * VoxelHalfSize * FaceLocalRight * -1 + BottomDensity * VoxelHalfSize * FaceLocalUp * -1 + FrontDensity * VoxelHalfSize * FaceNormal);
-		//Local TopLeft
-		FaceVertices.Add(VoxelLocation + LeftDensity * VoxelHalfSize * FaceLocalRight * -1 + TopDensity * VoxelHalfSize * FaceLocalUp + FrontDensity * VoxelHalfSize * FaceNormal);
-		//Local BottomRight
-		FaceVertices.Add(VoxelLocation + RightDensity * VoxelHalfSize * FaceLocalRight + BottomDensity * VoxelHalfSize * FaceLocalUp * -1 + FrontDensity * VoxelHalfSize * FaceNormal);
-		//Local TopRight
-		FaceVertices.Add(VoxelLocation + RightDensity * VoxelHalfSize * FaceLocalRight + TopDensity * VoxelHalfSize * FaceLocalUp + FrontDensity * VoxelHalfSize * FaceNormal);
-	}
-	
-	return FaceVertices;
+	if (IsSideFaceVisible(VoxelCoord, FaceNormal)) {
+		float VoxelDensity = TerrainDatas[ConvertXYZToIndex(VoxelCoord)].Density;
 
+		const FVoxelCoord NeighborCoord = VoxelCoord + FaceNormal;
+		float NeighborVoxelDensity = TerrainDatas[ConvertXYZToIndex(NeighborCoord)].Density;
+
+		float DensityHeightDiff = (VoxelDensity - NeighborVoxelDensity) * 0.5f;
+		
+		FVector FaceBottomCenterPosition = ConvertVoxelCoordToWorld(VoxelCoord) + FaceNormal * VoxelHalfSize - BOTTOM_DIR * VoxelHalfSize;
+		FVector FaceMiddlePosition = (NeighborVoxelDensity + DensityHeightDiff) * (VoxelHalfSize * 2) * TOP_DIR;
+
+		float HalfHeightDiff = DensityHeightDiff * VoxelHalfSize;
+		float HalfSideDiff = VoxelHalfSize;
+		FVector FaceHalfSize = GetAxisAtIndex(FaceNormal, 0) * HalfSideDiff + GetAxisAtIndex(FaceNormal, 1) * HalfHeightDiff;
+		
+		TArray<FVector> FaceOffsets = GenerateOffsets(FaceNormal);
+		for (auto& FaceOffset : FaceOffsets) {
+			FaceVertices.Add(FaceMiddlePosition + FaceHalfSize * FaceOffset);
+		}
+	}
+	return FaceVertices;
 }
 
-float AExcavationTerrain::GetDensityDiffOnSide(const FVoxelCoord& VoxelCoord, const FVector& SideNormal) {
-	//TODO
-	return 0.0f;
+bool AExcavationTerrain::IsSideFaceVisible(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal) {
+	bool IsFaceVisible = false;
+	const FVoxelCoord NeighborCoord = VoxelCoord + FaceNormal;
+
+	if (IsOutOfBounds(NeighborCoord)) {
+		IsFaceVisible = true;
+	}
+
+	if (!IsFaceVisible) {
+		if (TerrainDatas[ConvertXYZToIndex(VoxelCoord)].Density > TerrainDatas[ConvertXYZToIndex(NeighborCoord)].Density) {
+			IsFaceVisible = true;
+		}
+	}
+
+	return IsFaceVisible;
 }
 
 FVector AExcavationTerrain::ConvertVoxelCoordToWorld(const FVoxelCoord& VoxelCoord) {
 	//TODO
 	return {};
-}
-
-
-bool AExcavationTerrain::IsFaceVisible(const FVoxelCoord& Voxel, const FVoxelCoord& NeighborVoxel, const FVector& FaceNormal) {
-	bool IsVoxelFaceVisible = true;
-
-	EDirection FaceDirection = UTerrainHelpers::ConvertNormalToDirection(FaceNormal);
-	EDirection OppositeFaceDirection = UTerrainHelpers::GetOppositeDirection(FaceDirection);
-
-	//First check if the neighbor is in grid, if he is then no need to render the face
-	if (!IsOutOfBounds(NeighborVoxel)) {
-		IsVoxelFaceVisible = false;
-	}
-
-	//We check if on our side we are visible from inside our density
-	if (IsVoxelFaceVisible) {
-		if (FaceDirection != EDirection::ED_NONE) {
-			if (FMath::IsNearlyEqual(*TerrainDatas[ConvertXYZToIndex(Voxel)].VoxelDensities.Find(FaceDirection), 1.0f)) {
-				IsVoxelFaceVisible = false;
-			}
-		}
-	}
-
-	//If we are not visible from inside our voxel (so visibility was check to false) we check if we are visible form the neighbor voxel
-	if (!IsVoxelFaceVisible) {
-		EDirection NeighborFaceDirection = OppositeFaceDirection;
-		if (NeighborFaceDirection != EDirection::ED_NONE) {
-			if (*TerrainDatas[ConvertXYZToIndex(Voxel)].VoxelDensities.Find(NeighborFaceDirection) < 1.0f) {
-				IsVoxelFaceVisible = true;
-			}
-		}
-	}
-
-	//If the voxel is dig of both the side of an axis we check if its not entirely dig
-	if (IsVoxelFaceVisible) {
-		float VoxelFaceDensity = *TerrainDatas[ConvertXYZToIndex(Voxel)].VoxelDensities.Find(FaceDirection);
-		float VoxelOppositeFaceDensity = *TerrainDatas[ConvertXYZToIndex(Voxel)].VoxelDensities.Find(OppositeFaceDirection);
-
-		if (VoxelFaceDensity + VoxelOppositeFaceDensity <= -1.0f) {
-			IsVoxelFaceVisible = false;
-		}
-	}
-	
-	return IsVoxelFaceVisible;
 }
 
 int AExcavationTerrain::ConvertXYZToIndex(const FVoxelCoord& VoxelCoord) {

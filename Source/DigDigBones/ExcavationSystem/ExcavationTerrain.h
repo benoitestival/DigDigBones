@@ -22,6 +22,7 @@ public:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
 	TArray<FVoxel> TerrainDatas;
 	
+	
 	UPROPERTY(BlueprintreadWrite, EditAnywhere, meta = (ClampMin="0", ClampMax="100"))
 	int SizeX;
 	
@@ -51,6 +52,13 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	void RefreshTerrain();
+
+	UFUNCTION(BlueprintCallable)
+	TArray<FVector> ComputeSideFaceVertices(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal);
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	bool IsSideFaceVisible(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal);
+
+	FVector GetInterpVerticeOnVoxel(const FVoxelCoord& VoxelCoord);
 	
 	UFUNCTION()
 	TArray<FVector> ComputeFaceVertices(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal);

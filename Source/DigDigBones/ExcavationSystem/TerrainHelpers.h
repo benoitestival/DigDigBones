@@ -25,6 +25,8 @@ struct FVoxel {
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TMap<TEnumAsByte<EDirection>, float> VoxelDensities;
 	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float Density;
 };
 
 USTRUCT(BlueprintType)
