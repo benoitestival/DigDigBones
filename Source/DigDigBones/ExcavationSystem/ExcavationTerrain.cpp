@@ -148,7 +148,6 @@ TArray<FVector> AExcavationTerrain::ComputeFaceVertices(const FVoxelCoord& Voxel
 }
 
 float AExcavationTerrain::GetDensityDiffOnSide(const FVoxelCoord& VoxelCoord, const FVector& SideNormal) {
-	//TODO should handle if is on the bound
 	//TODO
 	return 0.0f;
 }
@@ -160,8 +159,46 @@ FVector AExcavationTerrain::ConvertVoxelCoordToWorld(const FVoxelCoord& VoxelCoo
 
 
 bool AExcavationTerrain::IsFaceVisible(const FVoxelCoord& Voxel, const FVoxelCoord& NeighborVoxel, const FVector& FaceNormal) {
-	//TODO should handle if is on the bound
-	return true;
+	bool IsVoxelFaceVisible = true;
+
+	EDirection FaceDirection = UTerrainHelpers::ConvertNormalToDirection(FaceNormal);
+	EDirection OppositeFaceDirection = UTerrainHelpers::GetOppositeDirection(FaceDirection);
+
+	//First check if the neighbor is in grid, if he is then no need to render the face
+	if (!IsOutOfBounds(NeighborVoxel)) {
+		IsVoxelFaceVisible = false;
+	}
+
+	//We check if on our side we are visible from inside our density
+	if (IsVoxelFaceVisible) {
+		if (FaceDirection != EDirection::ED_NONE) {
+			if (FMath::IsNearlyEqual(*TerrainDatas[ConvertXYZToIndex(Voxel)].VoxelDensities.Find(FaceDirection), 1.0f)) {
+				IsVoxelFaceVisible = false;
+			}
+		}
+	}
+
+	//If we are not visible from inside our voxel (so visibility was check to false) we check if we are visible form the neighbor voxel
+	if (!IsVoxelFaceVisible) {
+		EDirection NeighborFaceDirection = OppositeFaceDirection;
+		if (NeighborFaceDirection != EDirection::ED_NONE) {
+			if (*TerrainDatas[ConvertXYZToIndex(Voxel)].VoxelDensities.Find(NeighborFaceDirection) < 1.0f) {
+				IsVoxelFaceVisible = true;
+			}
+		}
+	}
+
+	//If the voxel is dig of both the side of an axis we check if its not entirely dig
+	if (IsVoxelFaceVisible) {
+		float VoxelFaceDensity = *TerrainDatas[ConvertXYZToIndex(Voxel)].VoxelDensities.Find(FaceDirection);
+		float VoxelOppositeFaceDensity = *TerrainDatas[ConvertXYZToIndex(Voxel)].VoxelDensities.Find(OppositeFaceDirection);
+
+		if (VoxelFaceDensity + VoxelOppositeFaceDensity <= -1.0f) {
+			IsVoxelFaceVisible = false;
+		}
+	}
+	
+	return IsVoxelFaceVisible;
 }
 
 int AExcavationTerrain::ConvertXYZToIndex(const FVoxelCoord& VoxelCoord) {

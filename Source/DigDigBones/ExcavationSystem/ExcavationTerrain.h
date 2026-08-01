@@ -5,48 +5,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "ProceduralMeshComponent.h"
+#include "TerrainHelpers.h"
 #include "ExcavationTerrain.generated.h"
-
-UENUM(BlueprintType)
-enum EDirection {
-	ED_NONE = 0,
-	ED_LEFT = 1,
-	ED_RIGHT = 2,
-	ED_FRONT = 4,
-	ED_BACK = 8,
-	ED_TOP = 16,
-	ED_BOTTOM = 32,
-};
-
-USTRUCT(BlueprintType)
-struct FVoxel {
-	GENERATED_BODY()
-	
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	TMap<TEnumAsByte<EDirection>, float> VoxelDensities;
-	
-};
-
-USTRUCT(BlueprintType)
-struct FVoxelCoord {
-	GENERATED_BODY()
-	
-	FVoxelCoord() = default;
-	FVoxelCoord(int X, int Y, int Z): Position(X, Y, Z){};
-	FVoxelCoord(const FIntVector& Pos): Position(Pos){};
-	FVoxelCoord(float X, float Y, float Z): Position(X, Y, Z){};
-	FVoxelCoord(const FVector& Pos): Position(Pos){};
-	
-	FVoxelCoord operator+(const FVoxelCoord& Other) const {
-		return FVoxelCoord(Position + Other.Position);
-	};
-	FVoxelCoord operator+(const FVector& Other) const {
-		return FVoxelCoord(Position + FIntVector(Other));
-	};
-	
-	UPROPERTY()
-	FIntVector Position;
-};
 
 
 UCLASS(Blueprintable, BlueprintType)
