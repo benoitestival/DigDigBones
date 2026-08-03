@@ -7,8 +7,6 @@
 #define NUM_POSSIBLE_FACES 6
 #define NUM_CORNERS 4
 
-#define NUM_AXIS 3
-
 #define UP 1
 #define RIGHT 0
 
@@ -74,7 +72,9 @@ void AExcavationTerrain::RefreshTerrain() {
 						};
 						for (auto& SideNormal : SideNormals) {
 							TArray<FVector> SideVertices = ComputeSideFaceVertices(Coord, SideNormal);
+							//TODO triangle etc
 						}
+						//todo top face
 					}
 				}
 			}
@@ -91,21 +91,11 @@ void AExcavationTerrain::RefreshTerrain() {
 TArray<FVector> AExcavationTerrain::ComputeSideFaceVertices(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal) {
 	TArray<FVector> FaceVertices = TArray<FVector>();
 	if (IsSideFaceVisible(VoxelCoord, FaceNormal)) {
-		float VoxelDensity = TerrainDatas[ConvertXYZToIndex(VoxelCoord)].Density;
-
-		const FVoxelCoord NeighborCoord = VoxelCoord + FaceNormal;
-		float NeighborVoxelDensity = TerrainDatas[ConvertXYZToIndex(NeighborCoord)].Density;
-
-		float DensityHeightDiff = (VoxelDensity - NeighborVoxelDensity) * 0.5f;
 		
-		FVector FaceBottomCenterPosition = ConvertVoxelCoordToWorld(VoxelCoord) + FaceNormal * VoxelHalfSize - BOTTOM_DIR * VoxelHalfSize;
-		FVector FaceMiddlePosition = (NeighborVoxelDensity + DensityHeightDiff) * (VoxelHalfSize * 2) * TOP_DIR;
-
-		float HalfHeightDiff = DensityHeightDiff * VoxelHalfSize;
-		float HalfSideDiff = VoxelHalfSize;
-		FVector FaceHalfSize = GetAxisAtIndex(FaceNormal, 0) * HalfSideDiff + GetAxisAtIndex(FaceNormal, 1) * HalfHeightDiff;
+		FVector FaceMiddlePosition = ComputeVoxelFaceMiddlePosition(VoxelCoord, FaceNormal);
+		FVector FaceHalfSize = ComputeVoxelFaceHalfSize(VoxelCoord, FaceNormal);
 		
-		TArray<FVector> FaceOffsets = GenerateOffsets(FaceNormal);
+		TArray<FVector> FaceOffsets = UTerrainHelpers::GenerateOffsets(FaceNormal);
 		for (auto& FaceOffset : FaceOffsets) {
 			FaceVertices.Add(FaceMiddlePosition + FaceHalfSize * FaceOffset);
 		}
@@ -130,9 +120,35 @@ bool AExcavationTerrain::IsSideFaceVisible(const FVoxelCoord& VoxelCoord, const 
 	return IsFaceVisible;
 }
 
+FVector AExcavationTerrain::ComputeVoxelFaceMiddlePosition(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal) {
+	const FVoxelCoord NeighborCoord = VoxelCoord + FaceNormal;
+		
+	float VoxelDensity = TerrainDatas[ConvertXYZToIndex(VoxelCoord)].Density;
+	float NeighborVoxelDensity = !IsOutOfBounds(NeighborCoord) ? TerrainDatas[ConvertXYZToIndex(NeighborCoord)].Density : 0.0f;
+	float DensityHeightDiff = (VoxelDensity - NeighborVoxelDensity) * 0.5f;
+		
+	FVector FaceBottomCenterPosition = ConvertVoxelCoordToWorld(VoxelCoord) + FaceNormal * VoxelHalfSize + BOTTOM_DIR * VoxelHalfSize;
+	FVector FaceMiddlePosition = FaceBottomCenterPosition + TOP_DIR * (NeighborVoxelDensity + DensityHeightDiff) * VoxelHalfSize * 2.0f;
+
+	return FaceMiddlePosition;
+}
+
+FVector AExcavationTerrain::ComputeVoxelFaceHalfSize(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal) {
+	const FVoxelCoord NeighborCoord = VoxelCoord + FaceNormal;
+		
+	float VoxelDensity = TerrainDatas[ConvertXYZToIndex(VoxelCoord)].Density;
+	float NeighborVoxelDensity = !IsOutOfBounds(NeighborCoord) ? TerrainDatas[ConvertXYZToIndex(NeighborCoord)].Density : 0.0f;
+	float DensityHeightDiff = (VoxelDensity - NeighborVoxelDensity) * 0.5f;
+
+	float HalfHeightDiff = DensityHeightDiff * VoxelHalfSize * 2.0f;
+	float HalfSideDiff = VoxelHalfSize;
+	FVector FaceHalfSize = UTerrainHelpers::GetAxisAtIndex(FaceNormal, 0) * HalfSideDiff + UTerrainHelpers::GetAxisAtIndex(FaceNormal, 1) * HalfHeightDiff;
+
+	return FaceHalfSize;
+}
+
 FVector AExcavationTerrain::ConvertVoxelCoordToWorld(const FVoxelCoord& VoxelCoord) {
-	//TODO
-	return {};
+	return GetActorLocation() + FVector(VoxelCoord.Position.X * VoxelHalfSize, VoxelCoord.Position.Y * VoxelHalfSize, VoxelCoord.Position.Z * VoxelHalfSize);
 }
 
 int AExcavationTerrain::ConvertXYZToIndex(const FVoxelCoord& VoxelCoord) {
@@ -143,53 +159,3 @@ bool AExcavationTerrain::IsOutOfBounds(const FVoxelCoord& VoxelCoord) {
 	return VoxelCoord.Position.X < 0 || VoxelCoord.Position.X >= SizeX ||  VoxelCoord.Position.Y < 0 || VoxelCoord.Position.Y >= SizeY || VoxelCoord.Position.Z < 0 || VoxelCoord.Position.Z >= SizeZ;
 }
 
-FVector AExcavationTerrain::MaskVector(const FVector& Vector) {
-	FVector MaskedVector = FVector();
-	MaskedVector.X = Vector.X != 0 ? 0 : 1;
-	MaskedVector.Y = Vector.Y != 0 ? 0 : 1;
-	MaskedVector.Z = Vector.Z != 0 ? 0 : 1;
-	return MaskedVector;
-}
-
-TArray<FVector> AExcavationTerrain::GenerateOffsets(const FVector& Axis) {
-	TArray<FVector> PossibleAxis = {
-		{1.0f, 0.0f, 0.0f},
-		{0.0f, 1.0f, 0.0f},
-		{0.0f, 0.0f, 1.0f},
-	};
-	TArray<FVector> PlaneAxis = TArray<FVector>();
-	for (int AxisIndex = 0; AxisIndex < NUM_AXIS; AxisIndex++) {
-		if (Axis[AxisIndex] != 0) {
-			PlaneAxis.Add(PossibleAxis[AxisIndex]);
-		}
-	}
-	return {
-		-PlaneAxis[0] - PlaneAxis[1],
-		-PlaneAxis[0] + PlaneAxis[1],
-		PlaneAxis[0] - PlaneAxis[1],
-		PlaneAxis[0] + PlaneAxis[1],
-	};
-	
-}
-
-FVector AExcavationTerrain::GetAxisAtIndex(const FVector& Axis, int Index) {
-	FVector FoundAxis = FVector::ZeroVector;
-	FVector MaskedAxis = MaskVector(Axis);
-	int AxisFound = 0;
-	TArray<FVector> PossibleAxis = {
-		{1.0f, 0.0f, 0.0f},
-		{0.0f, 1.0f, 0.0f},
-		{0.0f, 0.0f, 1.0f},
-	};
-	for (int AxisIndex = 0; AxisIndex < NUM_AXIS; AxisIndex++) {
-		if (MaskedAxis[AxisIndex] != 0) {
-			if (MaskedAxis[AxisIndex] == Index) {
-				FoundAxis = PossibleAxis[AxisIndex];
-			}
-			else {
-				AxisFound++;
-			}
-		}
-	}
-	return FoundAxis;
-}

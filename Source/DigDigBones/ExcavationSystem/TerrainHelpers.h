@@ -6,6 +6,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "TerrainHelpers.generated.h"
 
+#define NUM_AXIS 3
 
 UENUM(BlueprintType)
 enum EDirection {
@@ -21,9 +22,6 @@ enum EDirection {
 USTRUCT(BlueprintType)
 struct FVoxel {
 	GENERATED_BODY()
-	
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	TMap<TEnumAsByte<EDirection>, float> VoxelDensities;
 	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float Density;
@@ -65,4 +63,13 @@ public:
 	
 	UFUNCTION(Blueprintable, BlueprintPure)
 	static bool AreDirectionsNearlyEqual(const FVector& Normal1, const FVector& Normal2, const float Tolerance = 0.001f);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	static FVector MaskVector(const FVector& Vector);
+	
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	static TArray<FVector> GenerateOffsets(const FVector& Axis);
+	
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	static FVector GetAxisAtIndex(const FVector& Axis, int Index);
 };

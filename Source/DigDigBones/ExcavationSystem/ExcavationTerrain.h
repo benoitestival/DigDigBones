@@ -57,27 +57,14 @@ public:
 	TArray<FVector> ComputeSideFaceVertices(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal);
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	bool IsSideFaceVisible(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal);
-
-	FVector GetInterpVerticeOnVoxel(const FVoxelCoord& VoxelCoord);
-	
-	UFUNCTION()
-	TArray<FVector> ComputeFaceVertices(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal);
-	
-	
+private:
+	FVector ComputeVoxelFaceMiddlePosition(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal);
+	FVector ComputeVoxelFaceHalfSize(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal);
+public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	FVector ConvertVoxelCoordToWorld(const FVoxelCoord& VoxelCoord);
-	UFUNCTION(BlueprintCallable, BlueprintPure)
-	float GetDensityDiffOnSide(const FVoxelCoord& VoxelCoord, const FVector& SideNormal);
-	UFUNCTION(BlueprintCallable, BlueprintPure)
-	bool IsFaceVisible(const FVoxelCoord& Voxel, const FVoxelCoord& NeighborVoxel, const FVector& FaceNormal);
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	int ConvertXYZToIndex(const FVoxelCoord& VoxelCoord);
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	bool IsOutOfBounds(const FVoxelCoord& VoxelCoord);
-	UFUNCTION(BlueprintCallable, BlueprintPure)
-	FVector MaskVector(const FVector& Vector);
-	UFUNCTION(BlueprintCallable, BlueprintPure)
-	TArray<FVector> GenerateOffsets(const FVector& Axis);
-	UFUNCTION(BlueprintCallable, BlueprintPure)
-	FVector GetAxisAtIndex(const FVector& Axis, int Index);
 };
