@@ -90,4 +90,7 @@ FVector UTerrainHelpers::GetAxisAtIndex(const FVector& Axis, int Index) {
 		}
 	}
 	return FoundAxis;
+
+
+	
 }

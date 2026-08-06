@@ -52,7 +52,14 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	void RefreshTerrain();
-
+private:
+	void AppendFaceVerticesToTerrain(const FVoxelCoord& VoxelCoord, const TArray<FVector>& FaceVertices, TArray<FVector>& TerrainVertices, TArray<int>& TerrainTriangles, TArray<FVector>& TerrainNormals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors, TArray<FProcMeshTangent>& Tangents);
+public:
+	UFUNCTION(BlueprintCallable)
+	TArray<FVector> ComputeTopFaceVertices(const FVoxelCoord& VoxelCoord);
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	bool IsTopFaceVisible(const FVoxelCoord& VoxelCoord);
+	
 	UFUNCTION(BlueprintCallable)
 	TArray<FVector> ComputeSideFaceVertices(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal);
 	UFUNCTION(BlueprintCallable, BlueprintPure)

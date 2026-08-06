@@ -13,6 +13,11 @@
 #define BOTTOM_DIR FVector(0.0f, 0.0f, -1.0f)
 #define TOP_DIR FVector(0.0f, 0.0f, 1.0f)
 
+#define VERT_FIRST_INDEX TerrainVertices.Num() - 4
+#define VERT_SECOND_INDEX TerrainVertices.Num() - 3
+#define VERT_THIRD_INDEX TerrainVertices.Num() - 2
+#define VERT_FOURTH_INDEX TerrainVertices.Num() - 1
+
 // Sets default values
 AExcavationTerrain::AExcavationTerrain() {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
@@ -62,8 +67,8 @@ void AExcavationTerrain::RefreshTerrain() {
 		for (int X = 0; X < SizeX; X++) {
 			for (int Y = 0; Y < SizeY; Y++) {
 				for (int Z = 0; Z < SizeZ; Z++) {
-					FVoxelCoord Coord = FVoxelCoord(X, Y, Z);
-					if (!IsOutOfBounds(Coord)) {
+					FVoxelCoord VoxelCoord = FVoxelCoord(X, Y, Z);
+					if (!IsOutOfBounds(VoxelCoord)) {
 						TArray<FVector> SideNormals = {
 							{1.0f, 0.0f, 0.0f},
 							{-1.0f, 0.0f, 0.0f},
@@ -71,15 +76,22 @@ void AExcavationTerrain::RefreshTerrain() {
 							{0.0f, -1.0f, 0.0f},
 						};
 						for (auto& SideNormal : SideNormals) {
-							TArray<FVector> SideVertices = ComputeSideFaceVertices(Coord, SideNormal);
-							//TODO triangle etc
+							TArray<FVector> SideVertices = ComputeSideFaceVertices(VoxelCoord, SideNormal);
+							if (SideVertices.Num() > 0) {
+								AppendFaceVerticesToTerrain(VoxelCoord, SideVertices, Vertices, Triangles, Normals, UVs, VertexColors, Tangents);
+							}
+							
 						}
-						//todo top face
+						if (IsTopFaceVisible(VoxelCoord)) {
+							TArray<FVector> TopVertices = ComputeTopFaceVertices(VoxelCoord);
+							if (TopVertices.Num() > 0) {
+								AppendFaceVerticesToTerrain(VoxelCoord, TopVertices, Vertices, Triangles, Normals, UVs, VertexColors, Tangents);
+							}
+						}
 					}
 				}
 			}
 		}
-		
 		ProceduralMeshComponent->CreateMeshSection(0, Vertices, Triangles, Normals, UVs, VertexColors, Tangents, true);
 		
 	}
@@ -87,6 +99,46 @@ void AExcavationTerrain::RefreshTerrain() {
 		UE_LOG(LogTemp, Warning, TEXT("ProceduralMesh is not initialised"))
 	}
 }
+
+void AExcavationTerrain::AppendFaceVerticesToTerrain(const FVoxelCoord& VoxelCoord, const TArray<FVector>& FaceVertices, TArray<FVector>& TerrainVertices, TArray<int>& TerrainTriangles, TArray<FVector>& TerrainNormals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors, TArray<FProcMeshTangent>& Tangents) {
+	//Adding the face vertices
+	TerrainVertices.Append(FaceVertices);
+
+	//Side First triangle (BL, TL, BR) Anticlockwise
+	TerrainTriangles.Add(VERT_FIRST_INDEX);
+	TerrainTriangles.Add(VERT_SECOND_INDEX);
+	TerrainTriangles.Add(VERT_THIRD_INDEX);
+
+	//Side First triangle (TL, TR, BR) Anticlockwise
+	TerrainTriangles.Add(VERT_SECOND_INDEX);
+	TerrainTriangles.Add(VERT_FOURTH_INDEX);
+	TerrainTriangles.Add(VERT_THIRD_INDEX);
+		
+	//Compute the face normal
+	FVector FaceNormal = (FVector(FaceVertices[1] - FaceVertices[0]) ^ FVector(FaceVertices[2] - FaceVertices[0])).GetSafeNormal();
+	TerrainNormals.Add(FaceNormal);
+	TerrainNormals.Add(FaceNormal);
+	TerrainNormals.Add(FaceNormal);
+	TerrainNormals.Add(FaceNormal);
+
+	UVs.Add({0.0f, 0.0f});
+	UVs.Add({0.0f, 1.0f});
+	UVs.Add({1.0f, 0.0f});
+	UVs.Add({1.0f, 1.0f});
+
+	//TODO depending of the voxel make a channel in vertex color different so we can do material logic
+
+	//TODO calculate Tangents
+}
+
+TArray<FVector> AExcavationTerrain::ComputeTopFaceVertices(const FVoxelCoord& VoxelCoord) {
+	return ComputeSideFaceVertices(VoxelCoord, {0.0f, 0.0f, 1.0f});
+}
+
+bool AExcavationTerrain::IsTopFaceVisible(const FVoxelCoord& VoxelCoord) {
+	return IsSideFaceVisible(VoxelCoord, {0.0f, 0.0f, 1.0f});
+}
+
 
 TArray<FVector> AExcavationTerrain::ComputeSideFaceVertices(const FVoxelCoord& VoxelCoord, const FVector& FaceNormal) {
 	TArray<FVector> FaceVertices = TArray<FVector>();
