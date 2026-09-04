@@ -3,17 +3,21 @@
 
 #include "TerrainHelpers.h"
 
-TMap<FVector, EDirection> UTerrainHelpers::NormalToDirectionDictionnary = {
-	{{1.0f,0.0f,0.0f}, EDirection::ED_FRONT},
-	{{-1.0f,0.0f,0.0f}, EDirection::ED_BACK},
-	{{0.0f,1.0f,0.0f}, EDirection::ED_RIGHT},
-	{{0.0f,-1.0f,0.0f}, EDirection::ED_LEFT},
-	{{0.0f,0.0f,1.0f}, EDirection::ED_TOP},
-	{{0.0f,0.0f,-1.0f}, EDirection::ED_BOTTOM}
+#include "DigDigBones/Settings/SettingsHelpers.h"
+
+TMap<FVector, ENormalDirection> UTerrainHelpers::NormalToDirectionDictionnary = {
+	{{1.0f,0.0f,0.0f}, ENormalDirection::ED_FRONT},
+	{{-1.0f,0.0f,0.0f}, ENormalDirection::ED_BACK},
+	{{0.0f,1.0f,0.0f}, ENormalDirection::ED_RIGHT},
+	{{0.0f,-1.0f,0.0f}, ENormalDirection::ED_LEFT},
+	{{0.0f,0.0f,1.0f}, ENormalDirection::ED_TOP},
+	{{0.0f,0.0f,-1.0f}, ENormalDirection::ED_BOTTOM}
 };
 
-EDirection UTerrainHelpers::ConvertNormalToDirection(const FVector& Normal) {
-	EDirection NormalDirection = EDirection::ED_NONE;
+TMap<TEnumAsByte<ERarity>, float> UTerrainHelpers::RarityDigSpeed = {};
+
+ENormalDirection UTerrainHelpers::ConvertNormalToDirection(const FVector& Normal) {
+	ENormalDirection NormalDirection = ENormalDirection::ED_NONE;
 	if (Normal.IsUnit()) {
 		//Doesnt trust the equal operator in find so doing a for each with custom toelrance error;
 		for (auto& Pair : NormalToDirectionDictionnary) {
@@ -25,9 +29,9 @@ EDirection UTerrainHelpers::ConvertNormalToDirection(const FVector& Normal) {
 	return NormalDirection;
 }
 
-EDirection UTerrainHelpers::GetOppositeDirection(EDirection Direction) {
-	EDirection OppositeDirection = EDirection::ED_NONE;
-	if (Direction != EDirection::ED_NONE) {
+ENormalDirection UTerrainHelpers::GetOppositeDirection(ENormalDirection Direction) {
+	ENormalDirection OppositeDirection = ENormalDirection::ED_NONE;
+	if (Direction != ENormalDirection::ED_NONE) {
 		uint8 ByteDirection = Direction;
 		if (ByteDirection % 2) {
 			ByteDirection = ByteDirection - 1;
@@ -35,7 +39,7 @@ EDirection UTerrainHelpers::GetOppositeDirection(EDirection Direction) {
 		else {
 			ByteDirection = ByteDirection + 1;
 		}
-		OppositeDirection = static_cast<EDirection>(ByteDirection);
+		OppositeDirection = static_cast<ENormalDirection>(ByteDirection);
 	}
 	return OppositeDirection;
 }
@@ -90,7 +94,22 @@ FVector UTerrainHelpers::GetAxisAtIndex(const FVector& Axis, int Index) {
 		}
 	}
 	return FoundAxis;
+}
 
+FRarityTable UTerrainHelpers::BuildLootTable(const TMap<TEnumAsByte<ERarity>, float>& SpawnChances) {
+	return FRarityTable(SpawnChances);
+}
 
-	
+void UTerrainHelpers::ComputeBaseRarityDigSpeed() {
+	TArray<ERarity> DifferentRarities = {ERarity::ER_COMMON, ERarity::ER_UNCOMMON, ERarity::ER_RARE, ERarity::ER_EPIC, ERarity::ER_UNIQUE};
+	for (auto& Rarity : DifferentRarities) {
+		RarityDigSpeed.Add({Rarity, USettingsHelpers::GetRarityBaseDigSpeed(Rarity)});
+	}
+}
+
+float UTerrainHelpers::GetRarityDigSpeed(TEnumAsByte<ERarity> Rarity, float DigSpeedMultiplier) {
+	if (RarityDigSpeed.Num() == 0) {
+		ComputeBaseRarityDigSpeed();
+	}
+	return *RarityDigSpeed.Find(Rarity) * DigSpeedMultiplier;
 }

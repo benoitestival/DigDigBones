@@ -34,6 +34,12 @@ public:
 	
 	UPROPERTY(BlueprintreadWrite, EditAnywhere, meta = (ClampMin="0", ClampMax="100"))
 	float VoxelHalfSize;
+	
+	UPROPERTY(BlueprintReadOnly)
+	int LayersDig;
+	
+	UPROPERTY(BlueprintReadOnly)
+	int LayersVisibility;
 public:
 	// Sets default values for this actor's properties
 	AExcavationTerrain();
@@ -49,9 +55,12 @@ public:
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 public:
-	
 	UFUNCTION(BlueprintCallable)
-	void RefreshTerrain();
+	void GenerateTerrainDatas(const FIntVector& TerrainSize, const TMap<TEnumAsByte<ERarity>, float>& SpawnChances);
+	UFUNCTION(BlueprintCallable)
+	void RefreshTerrain(int DepthVisibility);
+	UFUNCTION(BlueprintCallable)
+	void Dig(const FVoxelCoord& Voxel, const float DigMultiplier);
 private:
 	void AppendFaceVerticesToTerrain(const FVoxelCoord& VoxelCoord, const TArray<FVector>& FaceVertices, TArray<FVector>& TerrainVertices, TArray<int>& TerrainTriangles, TArray<FVector>& TerrainNormals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors, TArray<FProcMeshTangent>& Tangents);
 public:

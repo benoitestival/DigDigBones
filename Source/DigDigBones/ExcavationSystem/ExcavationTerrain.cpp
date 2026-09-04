@@ -25,8 +25,6 @@ AExcavationTerrain::AExcavationTerrain() {
 	
 	ProceduralMeshComponent = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ProceduralMeshComponent"));
 	RootComponent = ProceduralMeshComponent;
-	
-	
 }
 
 // Called when the game starts or when spawned
@@ -43,12 +41,34 @@ void AExcavationTerrain::Tick(float DeltaTime) {
 void AExcavationTerrain::OnConstruction(const FTransform& Transform) {
 	Super::OnConstruction(Transform);
 	
-	RefreshTerrain();
+	RefreshTerrain(LayersVisibility);
 }
 
-void AExcavationTerrain::RefreshTerrain() {
+void AExcavationTerrain::GenerateTerrainDatas(const FIntVector& TerrainSize, const TMap<TEnumAsByte<ERarity>, float>& SpawnChances) {
+	TerrainDatas.Empty();
+	SizeX = TerrainSize.X;
+	SizeY = TerrainSize.Y;
+	SizeZ = TerrainSize.Z;
+	TerrainDatas.Reserve(SizeX * SizeY * SizeZ);
+
+	FRarityTable LootTable = UTerrainHelpers::BuildLootTable(SpawnChances);
+	
+	for (int X = 0; X < SizeX; ++X) {
+		for (int Y = 0; Y < SizeY; ++Y) {
+			for (int Z = 0; Z < SizeZ; ++Z) {
+				int RandomNumber = FMath::RandRange(0, 1000);
+				ERarity BlocRarity = LootTable << RandomNumber;
+				TerrainDatas.Add({1.0f, BlocRarity});
+			}
+		}
+	}
+	
+}
+
+void AExcavationTerrain::RefreshTerrain(int DepthVisibility) {
 	if (ProceduralMeshComponent != nullptr) {
 		
+		LayersVisibility = DepthVisibility;
 		ProceduralMeshComponent->ClearAllMeshSections();
 		
 		TArray<FVector> Vertices = TArray<FVector>();
@@ -59,6 +79,9 @@ void AExcavationTerrain::RefreshTerrain() {
 		TArray<FColor> VertexColors = TArray<FColor>();
 		TArray<FProcMeshTangent> Tangents = TArray<FProcMeshTangent>();
 		
+		int ZEnd = SizeZ - LayersDig;
+		int ZStart = ZEnd - LayersVisibility;
+		
 		Vertices.Reserve(SizeX * SizeY * SizeZ * AVG_VERTICES);
 		Triangles.Reserve(SizeX * SizeY * SizeZ * AVG_VERTICES * 3);
 		Normals.Reserve(SizeX * SizeY * SizeZ * AVG_VERTICES);
@@ -66,7 +89,7 @@ void AExcavationTerrain::RefreshTerrain() {
 		
 		for (int X = 0; X < SizeX; X++) {
 			for (int Y = 0; Y < SizeY; Y++) {
-				for (int Z = 0; Z < SizeZ; Z++) {
+				for (int Z = ZStart; Z < ZEnd; Z++) {
 					FVoxelCoord VoxelCoord = FVoxelCoord(X, Y, Z);
 					if (!IsOutOfBounds(VoxelCoord)) {
 						TArray<FVector> SideNormals = {
@@ -80,7 +103,6 @@ void AExcavationTerrain::RefreshTerrain() {
 							if (SideVertices.Num() > 0) {
 								AppendFaceVerticesToTerrain(VoxelCoord, SideVertices, Vertices, Triangles, Normals, UVs, VertexColors, Tangents);
 							}
-							
 						}
 						if (IsTopFaceVisible(VoxelCoord)) {
 							TArray<FVector> TopVertices = ComputeTopFaceVertices(VoxelCoord);
@@ -100,7 +122,24 @@ void AExcavationTerrain::RefreshTerrain() {
 	}
 }
 
+void AExcavationTerrain::Dig(const FVoxelCoord& Voxel, const float DigMultiplier) {
+	
+	int VoxelIndex = ConvertXYZToIndex(Voxel);
+	
+	float DensityOffset = UTerrainHelpers::GetRarityDigSpeed(TerrainDatas[VoxelIndex].Rarity, DigMultiplier);
+	TerrainDatas[VoxelIndex].Density -= DensityOffset;
+	
+	if (TerrainDatas[VoxelIndex].Density <= 0.0f) {
+		TerrainDatas[VoxelIndex].Density = 0.0f;
+		//TODO check if this was the last voxel of the line
+	}
+	
+	RefreshTerrain(LayersVisibility);
+}
+
 void AExcavationTerrain::AppendFaceVerticesToTerrain(const FVoxelCoord& VoxelCoord, const TArray<FVector>& FaceVertices, TArray<FVector>& TerrainVertices, TArray<int>& TerrainTriangles, TArray<FVector>& TerrainNormals, TArray<FVector2D>& UVs, TArray<FColor>& VertexColors, TArray<FProcMeshTangent>& Tangents) {
+	//TODO make a version for the top that can make some relief
+	
 	//Adding the face vertices
 	TerrainVertices.Append(FaceVertices);
 
@@ -126,12 +165,16 @@ void AExcavationTerrain::AppendFaceVerticesToTerrain(const FVoxelCoord& VoxelCoo
 	UVs.Add({1.0f, 0.0f});
 	UVs.Add({1.0f, 1.0f});
 
-	//TODO depending of the voxel make a channel in vertex color different so we can do material logic
+	VertexColors.Add(FColor(255.0f, 255.0f, 255.0f, TerrainDatas[ConvertXYZToIndex(VoxelCoord)].Rarity));
+	VertexColors.Add(FColor(255.0f, 255.0f, 255.0f, TerrainDatas[ConvertXYZToIndex(VoxelCoord)].Rarity));
+	VertexColors.Add(FColor(255.0f, 255.0f, 255.0f, TerrainDatas[ConvertXYZToIndex(VoxelCoord)].Rarity));
+	VertexColors.Add(FColor(255.0f, 255.0f, 255.0f, TerrainDatas[ConvertXYZToIndex(VoxelCoord)].Rarity));
 
 	//TODO calculate Tangents
 }
 
 TArray<FVector> AExcavationTerrain::ComputeTopFaceVertices(const FVoxelCoord& VoxelCoord) {
+	// TODO redo to add noise on top
 	return ComputeSideFaceVertices(VoxelCoord, {0.0f, 0.0f, 1.0f});
 }
 
