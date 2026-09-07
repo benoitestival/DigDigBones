@@ -83,4 +83,6 @@ public:
 	int ConvertXYZToIndex(const FVoxelCoord& VoxelCoord);
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	bool IsOutOfBounds(const FVoxelCoord& VoxelCoord);
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	bool IsTerrainLayerClear(int LayerIndex);
 };

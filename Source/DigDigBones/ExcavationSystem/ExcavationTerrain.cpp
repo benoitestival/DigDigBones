@@ -131,7 +131,9 @@ void AExcavationTerrain::Dig(const FVoxelCoord& Voxel, const float DigMultiplier
 	
 	if (TerrainDatas[VoxelIndex].Density <= 0.0f) {
 		TerrainDatas[VoxelIndex].Density = 0.0f;
-		//TODO check if this was the last voxel of the line
+		if (IsTerrainLayerClear(Voxel.Position.Z)) {
+			LayersDig++;
+		}
 	}
 	
 	RefreshTerrain(LayersVisibility);
@@ -254,3 +256,16 @@ bool AExcavationTerrain::IsOutOfBounds(const FVoxelCoord& VoxelCoord) {
 	return VoxelCoord.Position.X < 0 || VoxelCoord.Position.X >= SizeX ||  VoxelCoord.Position.Y < 0 || VoxelCoord.Position.Y >= SizeY || VoxelCoord.Position.Z < 0 || VoxelCoord.Position.Z >= SizeZ;
 }
 
+bool AExcavationTerrain::IsTerrainLayerClear(int LayerIndex) {
+	bool IsLayerClear = true;
+	if (LayerIndex >= 0 && LayerIndex < SizeZ) {
+		for (int X = 0; X < SizeX; X++) {
+			for (int Y = 0; Y < SizeY; Y++) {
+				if (TerrainDatas[ConvertXYZToIndex({X, Y, LayerIndex})].Density > 0.0f) {
+					IsLayerClear = false;
+				}
+			}
+		}
+	}
+	return IsLayerClear;
+}
